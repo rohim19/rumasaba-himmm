@@ -7,7 +7,7 @@ const Stok = () => {
     // --- BAHAN UTAMA ---
     { id: 1, name: 'Biji Kopi (Espresso)', stock: 1000, min: 200, unit: 'gr' },
     { id: 2, name: 'Susu UHT', stock: 12000, min: 2000, unit: 'ml' }, 
-    { id: 3, name: 'Susu Kental Manis (SKM)', stock: 5, min: 2, unit: 'kaleng' },
+    { id: 3, name: 'Susu Kental Manis (SKM)', stock: 12000, min: 2000, unit: 'ml' },
     { id: 4, name: 'Teh', stock: 500, min: 100, unit: 'gr' },
     { id: 5, name: 'Lemon', stock: 20, min: 5, unit: 'pcs' },
     
