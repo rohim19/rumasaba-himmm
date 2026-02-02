@@ -8,6 +8,7 @@ import Kasir from './components/Kasir';
 import Hutang from './components/Hutang';
 import Transaksi from './components/Transaksi';
 import Laporan from './components/Laporan';
+import ActivityLog from './components/ActivityLog'; 
 
 function App() {
   return (
@@ -19,10 +20,10 @@ function App() {
         <Route path="kasir" element={<Kasir />} />
         <Route path="transaksi" element={<Transaksi/>} />
         <Route path="hutang" element={<Hutang />} />
-        <Route path="laporan" element={<Laporan />} />
         <Route path="menu" element={<Menu />} /> 
         <Route path="stok" element={<Stok />} /> 
-        <Route path="laporan" element={<h1 className="text-3xl font-bold text-gray-800">Laporan Keuangan</h1>} />
+        <Route path="laporan" element={<Laporan />} />
+        <Route path="activity-log" element={<ActivityLog />} />
       </Route>
     </Routes>
   );

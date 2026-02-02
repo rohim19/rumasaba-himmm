@@ -21,12 +21,28 @@ const Hutang = () => {
     setDebts(unpaidDebts);
   };
 
-  // 2. FUNGSI BUKA MODAL KONFIRMASI
+  // 👇 2. FUNGSI CCTV (LOGGER)
+  const logActivity = (action, change) => {
+    const user = localStorage.getItem('userRumaSaba') || 'Envy';
+    const newLog = {
+      id: Date.now(),
+      time: new Date().toLocaleString('id-ID'),
+      username: user,
+      activity: action,
+      change: change
+    };
+    const currentLogs = JSON.parse(localStorage.getItem('rumaSabaLogs') || '[]');
+    localStorage.setItem('rumaSabaLogs', JSON.stringify([newLog, ...currentLogs]));
+  };
+
+  // 3. FUNGSI BUKA MODAL KONFIRMASI
   const openConfirmLunas = (debt) => {
     setConfirmModal({ isOpen: true, data: debt });
   };
 
-  // 3. FUNGSI PROSES PELUNASAN (EKSEKUSI)
+  const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+
+  // 4. FUNGSI PROSES PELUNASAN (EKSEKUSI)
   const processLunas = () => {
     const debt = confirmModal.data;
     if (!debt) return;
@@ -45,11 +61,14 @@ const Hutang = () => {
     // Update tampilan di layar (Hapus dari daftar hutang)
     setDebts(debts.filter(d => d.id !== debt.id));
     
+    // 👇 5. REKAM KE ACTIVITY LOG
+    logActivity('Pelunasan Hutang', `Melunasi hutang ${debt.customerName} sebesar ${formatRupiah(debt.total)}`);
+
     // Tutup confirm, Buka sukses
     setConfirmModal({ isOpen: false, data: null });
     setSuccessModal(true);
 
-    // Auto tutup sukses setelah 2 detik (Opsional, biar cepet)
+    // Auto tutup sukses setelah 2 detik
     setTimeout(() => {
         setSuccessModal(false);
     }, 2000);
@@ -58,8 +77,6 @@ const Hutang = () => {
   const filteredDebts = debts.filter(d => 
     d.customerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -83,49 +100,51 @@ const Hutang = () => {
 
       {/* TABEL HUTANG */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm text-left">
-            <thead className="bg-orange-50 text-orange-800 font-bold">
-                <tr>
-                    <th className="px-6 py-4">Tanggal</th>
-                    <th className="px-6 py-4">Nama Pelanggan</th>
-                    <th className="px-6 py-4">Detail Pesanan</th>
-                    <th className="px-6 py-4">Total Hutang</th>
-                    <th className="px-6 py-4 text-center">Aksi</th>
-                </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-                {filteredDebts.length === 0 ? (
-                    <tr><td colSpan="5" className="px-6 py-12 text-center text-gray-400">
-                        <div className="flex flex-col items-center gap-2">
-                            <CheckCircle size={32} className="text-emerald-200"/>
-                            <p>Tidak ada catatan hutang. Aman bos! 👍</p>
-                        </div>
-                    </td></tr>
-                ) : (
-                    filteredDebts.map(debt => (
-                        <tr key={debt.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-gray-500">{new Date(debt.date).toLocaleDateString('id-ID')}</td>
-                            <td className="px-6 py-4 font-bold text-gray-800 capitalize">{debt.customerName}</td>
-                            <td className="px-6 py-4 text-gray-600">
-                                <ul className="list-disc list-inside text-xs">
-                                    {debt.items.map((item, idx) => (
-                                        <li key={idx}>{item.qty}x {item.name}</li>
-                                    ))}
-                                </ul>
-                            </td>
-                            <td className="px-6 py-4 font-bold text-orange-600 text-base">{formatRupiah(debt.total)}</td>
-                            <td className="px-6 py-4 text-center">
-                                {/* TOMBOL BUKA MODAL */}
-                                <button onClick={() => openConfirmLunas(debt)} 
-                                    className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm active:scale-95">
-                                    <CheckCircle size={14} /> Tandai Lunas
-                                </button>
-                            </td>
-                        </tr>
-                    ))
-                )}
-            </tbody>
-        </table>
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+                <thead className="bg-orange-50 text-orange-800 font-bold">
+                    <tr>
+                        <th className="px-6 py-4">Tanggal</th>
+                        <th className="px-6 py-4">Nama Pelanggan</th>
+                        <th className="px-6 py-4">Detail Pesanan</th>
+                        <th className="px-6 py-4">Total Hutang</th>
+                        <th className="px-6 py-4 text-center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                    {filteredDebts.length === 0 ? (
+                        <tr><td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                            <div className="flex flex-col items-center gap-2">
+                                <CheckCircle size={32} className="text-emerald-200"/>
+                                <p>Tidak ada catatan hutang. Aman bos! 👍</p>
+                            </div>
+                        </td></tr>
+                    ) : (
+                        filteredDebts.map(debt => (
+                            <tr key={debt.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 text-gray-500">{new Date(debt.date).toLocaleDateString('id-ID')}</td>
+                                <td className="px-6 py-4 font-bold text-gray-800 capitalize">{debt.customerName}</td>
+                                <td className="px-6 py-4 text-gray-600">
+                                    <ul className="list-disc list-inside text-xs">
+                                        {debt.items.map((item, idx) => (
+                                            <li key={idx}>{item.qty}x {item.name}</li>
+                                        ))}
+                                    </ul>
+                                </td>
+                                <td className="px-6 py-4 font-bold text-orange-600 text-base">{formatRupiah(debt.total)}</td>
+                                <td className="px-6 py-4 text-center">
+                                    {/* TOMBOL BUKA MODAL */}
+                                    <button onClick={() => openConfirmLunas(debt)} 
+                                        className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm active:scale-95">
+                                        <CheckCircle size={14} /> Tandai Lunas
+                                    </button>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
       </div>
 
       {/* --- MODAL 1: KONFIRMASI PELUNASAN --- */}

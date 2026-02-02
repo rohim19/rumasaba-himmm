@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-// 1. Tambah icon Package di sini
-import { LayoutDashboard, ShoppingCart, Receipt, CreditCard, UtensilsCrossed, FileBarChart, User, Clock, Key, LogOut, Package } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Receipt, CreditCard, UtensilsCrossed, FileBarChart, User, Clock, Key, LogOut, Package, History } from 'lucide-react';
 import { format } from 'date-fns'; 
 import logoSaba from '../assets/logo.png';
 
@@ -45,12 +44,12 @@ const Layout = () => {
     { name: 'Transaksi', path: '/transaksi', icon: <Receipt size={20} /> },
     { name: 'Hutang', path: '/hutang', icon: <CreditCard size={20} /> },
     { name: 'Menu', path: '/menu', icon: <UtensilsCrossed size={20} /> },
-    // 2. MENU BARU: STOK BAHAN
     { name: 'Stok Bahan', path: '/stok', icon: <Package size={20} /> },
+    { name: 'Activity Log', path: '/activity-log', icon: <History size={20} /> },
     { name: 'Laporan', path: '/laporan', icon: <FileBarChart size={20} /> },
   ];
 
-  // Kalau username kosong (lagi proses redirect), jangan tampilkan apa-apa dulu biar gak glitch
+  
   if (!username) return null;
 
   return (

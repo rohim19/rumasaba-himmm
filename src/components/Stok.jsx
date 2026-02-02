@@ -1,15 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Search, Edit2, Trash2, X, AlertTriangle, CheckCircle, RefreshCcw } from 'lucide-react';
+import { Package, Plus, Search, Edit2, Trash2, X, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const Stok = () => {
-  // DATA DEFAULT (Kalau kosong)
+  // DATA DEFAULT
   const defaultStok = [
-    { id: 1, name: 'Biji Kopi Arabica', stock: 5000, min: 1000, unit: 'gr' },
-    { id: 2, name: 'Susu UHT', stock: 200, min: 1000, unit: 'ml' },
-    { id: 3, name: 'Gula Aren', stock: 400, min: 500, unit: 'ml' },
-    { id: 4, name: 'Cup Plastik 16oz', stock: 45, min: 50, unit: 'pcs' },
-    { id: 5, name: 'Sirup Vanilla', stock: 750, min: 200, unit: 'ml' },
-    { id: 6, name: 'Gelas cup 100ml', stock: 100, min: 20, unit: 'pcs' },
+    // --- BAHAN UTAMA ---
+    { id: 1, name: 'Biji Kopi (Espresso)', stock: 1000, min: 200, unit: 'gr' },
+    { id: 2, name: 'Susu UHT', stock: 12000, min: 2000, unit: 'ml' }, 
+    { id: 3, name: 'Susu Kental Manis (SKM)', stock: 5, min: 2, unit: 'kaleng' },
+    { id: 4, name: 'Teh', stock: 500, min: 100, unit: 'gr' },
+    { id: 5, name: 'Lemon', stock: 20, min: 5, unit: 'pcs' },
+    
+    // --- BUBUK RASA (POWDER) ---
+    { id: 6, name: 'Bubuk Matcha', stock: 500, min: 100, unit: 'gr' },
+    { id: 7, name: 'Bubuk Coklat', stock: 1000, min: 200, unit: 'gr' },
+    { id: 8, name: 'Bubuk Creamer', stock: 1000, min: 200, unit: 'gr' },
+
+    // --- SIRUP & PEMANIS ---
+    { id: 9, name: 'Gula Aren Cair', stock: 2000, min: 500, unit: 'ml' },
+    { id: 10, name: 'Gula Pasir', stock: 2000, min: 500, unit: 'gr' },
+    { id: 11, name: 'Sirup Butterscotch', stock: 750, min: 100, unit: 'ml' },
+    { id: 12, name: 'Sirup Caramel', stock: 750, min: 100, unit: 'ml' },
+    { id: 13, name: 'Sirup Hazelnut', stock: 750, min: 100, unit: 'ml' },
+    { id: 14, name: 'Sirup Vanilla', stock: 750, min: 100, unit: 'ml' },
+
+    // --- PERLENGKAPAN ---
+    { id: 15, name: 'Cup Plastik', stock: 100, min: 20, unit: 'pcs' },
+    { id: 16, name: 'Sedotan', stock: 200, min: 50, unit: 'pcs' },
+    { id: 17, name: 'Kantong Plastik (Takeaway)', stock: 100, min: 20, unit: 'pcs' },
+    { id: 18, name: 'Es Batu', stock: 10000, min: 2000, unit: 'gr' }, 
   ];
 
   const [stockItems, setStockItems] = useState(() => {
@@ -19,18 +38,29 @@ const Stok = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // FORM STATE
   const [formData, setFormData] = useState({ id: null, name: '', stock: '', min: '', unit: 'pcs' });
 
-  // SIMPAN KE LOCALSTORAGE SETIAP ADA PERUBAHAN
   useEffect(() => {
     localStorage.setItem('rumaSabaStok', JSON.stringify(stockItems));
   }, [stockItems]);
 
-  const filteredStok = stockItems.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 👇 1. PASANG CCTV (LOGGER) DISINI
+  const logActivity = (action, change) => {
+    const user = localStorage.getItem('userRumaSaba') || 'Envy';
+    const newLog = {
+      id: Date.now(),
+      time: new Date().toLocaleString('id-ID'),
+      username: user,
+      activity: action,
+      change: change
+    };
+    const currentLogs = JSON.parse(localStorage.getItem('rumaSabaLogs') || '[]');
+    localStorage.setItem('rumaSabaLogs', JSON.stringify([newLog, ...currentLogs]));
+  };
+
+  const filteredStok = stockItems
+    .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // --- CRUD LOGIC ---
   const handleAddNew = () => {
@@ -43,9 +73,12 @@ const Stok = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (item) => { // Ubah jadi terima Item (bukan ID doang)
     if (window.confirm('Yakin mau hapus data stok ini?')) {
-      setStockItems(stockItems.filter(item => item.id !== id));
+      setStockItems(stockItems.filter(s => s.id !== item.id));
+      
+      // 📹 REKAM HAPUS
+      logActivity('Delete Stok', `Menghapus stok: ${item.name}`);
     }
   };
 
@@ -60,20 +93,31 @@ const Stok = () => {
     };
 
     if (formData.id) {
-        // Edit Mode
+        // MODE EDIT
+        const oldItem = stockItems.find(s => s.id === formData.id);
         setStockItems(stockItems.map(item => item.id === formData.id ? finalData : item));
+        
+        // 📹 REKAM EDIT (Cek Perubahan)
+        let changes = [];
+        if(oldItem.stock !== finalData.stock) changes.push(`Qty: ${oldItem.stock} -> ${finalData.stock}`);
+        if(oldItem.name !== finalData.name) changes.push(`Nama: ${oldItem.name} -> ${finalData.name}`);
+        
+        if(changes.length > 0) {
+            logActivity('Update Stok', `Edit ${finalData.name}: ${changes.join(', ')}`);
+        }
+
     } else {
-        // Add New Mode
+        // MODE TAMBAH
         setStockItems([...stockItems, { ...finalData, id: Date.now() }]);
+        
+        // 📹 REKAM TAMBAH
+        logActivity('Add Stok', `Menambah stok baru: ${finalData.name} (${finalData.stock} ${finalData.unit})`);
     }
     setIsModalOpen(false);
   };
 
-  // --- LOGIKA AUTO CAPITALIZE (HURUF DEPAN BESAR) ---
   const handleNameChange = (e) => {
     const val = e.target.value;
-    // Ambil huruf pertama jadikan besar, sisanya biarkan (Sentence Case)
-    // Contoh: "teh" -> "Teh"
     const capitalized = val.length > 0 ? val.charAt(0).toUpperCase() + val.slice(1) : val;
     setFormData({ ...formData, name: capitalized });
   };
@@ -126,7 +170,7 @@ const Stok = () => {
                                     <td className="px-6 py-4 font-bold text-gray-800">{item.name}</td>
                                     <td className="px-6 py-4">
                                         <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium">
-                                            {item.unit === 'pcs' || item.unit === 'cup' ? 'Perlengkapan' : 'Bahan Baku'}
+                                            {item.unit === 'pcs' || item.unit === 'cup' || item.unit === 'kaleng' ? 'Perlengkapan' : 'Bahan Baku'}
                                         </span>
                                     </td>
                                     <td className={`px-6 py-4 font-bold text-base ${isLow ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -149,7 +193,8 @@ const Stok = () => {
                                     <td className="px-6 py-4">
                                         <div className="flex justify-center gap-2">
                                             <button onClick={() => handleEdit(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={16}/></button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                            {/* 👇 Ubah disini jadi passing Item */}
+                                            <button onClick={() => handleDelete(item)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -171,14 +216,13 @@ const Stok = () => {
               </div>
               
               <form onSubmit={handleSave} className="p-6 space-y-4">
-                  {/* INPUT NAMA BAHAN (AUTO CAPITALIZE) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Nama Bahan</label>
                     <input 
                         type="text" 
                         className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-emerald-500 outline-none placeholder:text-gray-300" 
                         value={formData.name} 
-                        onChange={handleNameChange} // <--- Logic Auto Capitalize dipanggil disini
+                        onChange={handleNameChange}
                         placeholder="Contoh: Susu UHT" 
                         autoFocus
                     />
@@ -201,6 +245,7 @@ const Stok = () => {
                           <option value="ml">Mili (ml)</option>
                           <option value="lt">Liter (L)</option>
                           <option value="cup">Cup</option>
+                          <option value="kaleng">Kaleng</option>
                       </select>
                     </div>
                   </div>
