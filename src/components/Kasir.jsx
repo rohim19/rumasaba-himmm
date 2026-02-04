@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, User, FileText, X, CheckCircle, Printer, ArrowRight } from 'lucide-react';
-
+import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, User, FileText, X, CheckCircle, Printer, ArrowRight, Save, QrCode } from 'lucide-react';
+import qrisImage from '../assets/qris-toko.jpg';
 const Kasir = () => {
   // 1. AMBIL DATA MENU
   const [menuItems, setMenuItems] = useState([]);
-  
+
+
   useEffect(() => {
     const savedMenu = localStorage.getItem('rumaSabaMenu');
     if (savedMenu) setMenuItems(JSON.parse(savedMenu));
@@ -14,11 +15,14 @@ const Kasir = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   
-  // STATE MODAL
+  // STATE MODAL & PEMBAYARAN
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('Tunai'); 
   const [customerName, setCustomerName] = useState('');
-  const [successData, setSuccessData] = useState(null); 
+  const [cashIn, setCashIn] = useState(''); 
+  
+  // STATE STRUK
+  const [receiptData, setReceiptData] = useState(null); 
 
   const categories = ['All', 'Coffee', 'Non-Coffee', 'Tea', 'Snack'];
 
@@ -46,10 +50,14 @@ const Kasir = () => {
     setCart(cart.filter((item) => item.id !== id));
   };
 
-  // --- REVISI PERHITUNGAN (HAPUS PAJAK) ---
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  // const tax = subtotal * 0.1;  <-- INI BIANG KEROKNYA, KITA HAPUS
-  const total = subtotal; // Total sekarang sama dengan Subtotal (Harga Pas)
+  const total = subtotal;
+
+  // HITUNG KEMBALIAN & VALIDASI
+  const uangMasuk = parseInt(cashIn) || 0;
+  // Kalau QRIS, kembalian selalu 0
+  const kembalian = paymentMethod === 'Tunai' ? uangMasuk - total : 0;
+  const isBayarKurang = paymentMethod === 'Tunai' && uangMasuk < total;
 
   const filteredMenu = menuItems.filter(item => {
     const matchCat = selectedCategory === 'All' || item.category === selectedCategory;
@@ -59,19 +67,40 @@ const Kasir = () => {
 
   const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
 
+  // --- LOGGER CCTV ---
+  const logActivity = (action, change) => {
+    const user = localStorage.getItem('userRumaSaba') || 'Envy';
+    const newLog = {
+      id: Date.now(),
+      time: new Date().toLocaleString('id-ID'),
+      username: user,
+      activity: action,
+      change: change
+    };
+    const currentLogs = JSON.parse(localStorage.getItem('rumaSabaLogs') || '[]');
+    localStorage.setItem('rumaSabaLogs', JSON.stringify([newLog, ...currentLogs]));
+  };
+
   const handleOpenPayment = () => {
     if (cart.length > 0) {
         setPaymentModalOpen(true);
         setPaymentMethod('Tunai');
         setCustomerName('');
+        setCashIn(''); 
     }
   };
 
   // --- LOGIC TRANSAKSI ---
   const processTransaction = () => {
-    if (paymentMethod === 'Hutang' && !customerName.trim()) return;
+    // Validasi
+    if (paymentMethod === 'Hutang' && !customerName.trim()) return alert("Nama wajib diisi buat yang ngutang!");
+    if (paymentMethod === 'Tunai' && isBayarKurang) return alert("Uang pembayarannya kurang bro!");
 
     const finalCustomerName = customerName.trim() || 'Umum';
+
+    // Tentukan Uang Masuk (Kalau QRIS/Hutang dianggap pas sesuai total)
+    const finalCashIn = paymentMethod === 'Tunai' ? uangMasuk : total;
+    const finalChange = paymentMethod === 'Tunai' ? kembalian : 0;
 
     const transactionData = {
         id: Date.now(),
@@ -80,10 +109,12 @@ const Kasir = () => {
         total: total,
         method: paymentMethod,
         customerName: finalCustomerName,
+        cashIn: finalCashIn, 
+        change: finalChange,     
         status: paymentMethod === 'Hutang' ? 'Belum Lunas' : 'Lunas'
     };
 
-    // SIMPAN RIWAYAT
+    // 1. SIMPAN RIWAYAT
     const existingTrx = JSON.parse(localStorage.getItem('rumaSabaTrx') || '[]');
     localStorage.setItem('rumaSabaTrx', JSON.stringify([transactionData, ...existingTrx]));
 
@@ -92,7 +123,7 @@ const Kasir = () => {
         localStorage.setItem('rumaSabaHutang', JSON.stringify([...existingDebts, transactionData]));
     }
 
-    // POTONG STOK OTOMATIS
+    // 2. POTONG STOK OTOMATIS
     const currentStocks = JSON.parse(localStorage.getItem('rumaSabaStok') || '[]');
     let isStockUpdated = false;
 
@@ -113,13 +144,13 @@ const Kasir = () => {
         localStorage.setItem('rumaSabaStok', JSON.stringify(currentStocks));
     }
 
-    setPaymentModalOpen(false);
-    setSuccessData(transactionData);
-    setCart([]);
-  };
+    // 3. CATAT LOG
+    logActivity('Transaksi Baru', `Penjualan ${paymentMethod} senilai ${formatRupiah(total)}`);
 
-  const closeSuccessModal = () => {
-    setSuccessData(null);
+    // 4. RESET & BUKA STRUK
+    setPaymentModalOpen(false);
+    setReceiptData(transactionData); 
+    setCart([]);
   };
 
   return (
@@ -205,7 +236,7 @@ const Kasir = () => {
         </div>
       </div>
 
-      {/* --- MODAL INPUT PEMBAYARAN --- */}
+      {/* --- MODAL PEMBAYARAN --- */}
       {isPaymentModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform transition-all scale-100">
@@ -220,62 +251,148 @@ const Kasir = () => {
                         <h2 className="text-3xl font-bold text-emerald-600 mt-1">{formatRupiah(total)}</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => setPaymentMethod('Tunai')}
-                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all
-                            ${paymentMethod === 'Tunai' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-100 bg-white text-gray-500 hover:bg-gray-50'}`}>
-                            <CreditCard size={24} /> <span className="font-bold text-sm">Bayar Tunai</span>
-                        </button>
-                        <button onClick={() => setPaymentMethod('Hutang')}
-                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all
-                            ${paymentMethod === 'Hutang' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-100 bg-white text-gray-500 hover:bg-gray-50'}`}>
-                            <FileText size={24} /> <span className="font-bold text-sm">Ngutang / Bon</span>
-                        </button>
+                    <div className="grid grid-cols-3 gap-2">
+                        {['Tunai', 'QRIS', 'Hutang'].map(method => (
+                             <button key={method} onClick={() => setPaymentMethod(method)}
+                                className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
+                                ${paymentMethod === method 
+                                    ? (method === 'Hutang' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700') 
+                                    : 'border-gray-100 bg-white text-gray-500 hover:bg-gray-50'}`}>
+                                {method === 'Tunai' && <CreditCard size={20} />}
+                                {method === 'QRIS' && <QrCode size={20} />}
+                                {method === 'Hutang' && <FileText size={20} />}
+                                <span className="font-bold text-xs">{method}</span>
+                            </button>
+                        ))}
                     </div>
 
-                    <div className="animate-in slide-in-from-top-2 duration-200">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Nama Pelanggan {paymentMethod === 'Tunai' ? <span className="text-gray-400 font-normal">(Opsional)</span> : <span className="text-red-500 font-bold">*Wajib</span>}
-                        </label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input type="text" autoFocus
-                                placeholder={paymentMethod === 'Tunai' ? "Contoh: Pak Budi (Boleh kosong)" : "Masukkan nama pengutang..."}
-                                className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none transition-colors
-                                ${paymentMethod === 'Hutang' ? 'border-orange-300 bg-orange-50/30' : 'border-gray-300 focus:ring-emerald-500'}`}
-                                value={customerName} onChange={(e) => setCustomerName(e.target.value)}
-                            />
+                    {/* --- KONTEN DINAMIS BERDASARKAN METODE --- */}
+                    
+                    {/* 1. TUNAI */}
+                    {paymentMethod === 'Tunai' && (
+                        <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Uang Diterima (Cash)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Rp</span>
+                                    <input type="number" 
+                                        className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 focus:ring-emerald-500 outline-none font-bold text-gray-800"
+                                        placeholder="0" value={cashIn} onChange={e => setCashIn(e.target.value)} autoFocus
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center border-t border-dashed border-gray-300 pt-2">
+                                <span className="text-xs font-bold text-gray-500">Kembalian</span>
+                                <span className={`text-lg font-black ${kembalian < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {formatRupiah(kembalian)}
+                                </span>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    <button onClick={processTransaction} disabled={paymentMethod === 'Hutang' && !customerName.trim()}
+                    {/* 2. QRIS (TAMPILKAN GAMBAR) */}
+                    {paymentMethod === 'QRIS' && (
+                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-center">
+                            <p className="text-xs font-bold text-gray-500 mb-2">Scan QRIS Ruma Saba</p>
+                            <div className="w-48 h-48 bg-gray-100 rounded-lg overflow-hidden mb-2">
+                                {/* GANTI SRC INI DENGAN LINK QRIS TOKOMU */}
+                                <img src={qrisImage} alt="QRIS Code" className="w-full h-full object-cover p-2" />
+                            </div>
+                            <p className="text-[10px] text-gray-400">Pastikan nominal transfer sesuai: <b>{formatRupiah(total)}</b></p>
+                        </div>
+                    )}
+
+                    {/* 3. INPUT NAMA PELANGGAN (Wajib utk Hutang) */}
+                    {(paymentMethod === 'Tunai' || paymentMethod === 'Hutang') && (
+                        <div className="animate-in slide-in-from-top-2 duration-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Nama Pelanggan {paymentMethod === 'Tunai' ? <span className="text-gray-400 font-normal">(Opsional)</span> : <span className="text-red-500 font-bold">*Wajib</span>}
+                            </label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input type="text"
+                                    placeholder={paymentMethod === 'Tunai' ? "Contoh: Pak Budi (Boleh kosong)" : "Masukkan nama pengutang..."}
+                                    className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none transition-colors
+                                    ${paymentMethod === 'Hutang' ? 'border-orange-300 bg-orange-50/30' : 'border-gray-300 focus:ring-emerald-500'}`}
+                                    value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <button onClick={processTransaction} 
                         className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 flex justify-center items-center gap-2
-                        ${paymentMethod === 'Hutang' ? (!customerName.trim() ? 'bg-orange-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600') : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                        {paymentMethod === 'Hutang' ? 'Simpan Catatan Hutang' : 'Selesai Pembayaran'} <ArrowRight size={18}/>
+                        ${paymentMethod === 'Hutang' 
+                            ? (!customerName.trim() ? 'bg-orange-300 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600') 
+                            : (paymentMethod === 'Tunai' && isBayarKurang ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}`}>
+                        
+                        {paymentMethod === 'Hutang' && <Save size={18}/>}
+                        {paymentMethod === 'Tunai' && <CheckCircle size={18}/>}
+                        {paymentMethod === 'QRIS' && <CheckCircle size={18}/>}
+
+                        {paymentMethod === 'Hutang' ? 'Simpan Hutang' : (paymentMethod === 'QRIS' ? 'Cek Mutasi & Konfirmasi' : 'Proses Bayar')}
                     </button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* --- MODAL SUKSES --- */}
-      {successData && (
-        <div className="fixed inset-0 bg-emerald-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in zoom-in-95 duration-300">
-            <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden text-center relative p-8">
-                <div className="absolute top-0 left-0 w-full h-32 bg-emerald-50 rounded-b-[50%] -z-10"></div>
-                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-lg animate-bounce">
-                    <CheckCircle size={40} />
-                </div>
-                <h2 className="text-2xl font-black text-gray-800 mb-1">Transaksi Berhasil!</h2>
-                <p className="text-gray-500 text-sm mb-6">Stok bahan baku otomatis diperbarui.</p>
+      {/* --- MODAL STRUK (RECEIPT STYLE) --- */}
+      {receiptData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in zoom-in-95 duration-200">
+            <div className="bg-white w-full max-w-xs shadow-2xl overflow-hidden relative font-mono text-sm">
                 
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6 text-left space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-gray-500">Pelanggan</span><span className="font-bold capitalize">{successData.customerName}</span></div>
-                    <div className="border-t pt-2 flex justify-between text-lg font-bold text-emerald-700"><span>Total</span><span>{formatRupiah(successData.total)}</span></div>
+                {/* Kertas Struk */}
+                <div className="p-6 bg-white relative">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-[linear-gradient(90deg,transparent_50%,#fff_50%)] bg-[length:10px_10px]"></div>
+
+                    <div className="text-center mb-4 border-b-2 border-dashed border-gray-200 pb-4">
+                        <h2 className="font-black text-xl uppercase tracking-widest">RUMA SABA</h2>
+                        <p className="text-[10px] text-gray-500">Jl. Kopi Nikmat No. 1</p>
+                        <p className="text-[10px] text-gray-500">{new Date(receiptData.date).toLocaleString('id-ID')}</p>
+                    </div>
+
+                    <div className="space-y-2 mb-4 border-b-2 border-dashed border-gray-200 pb-4">
+                        {receiptData.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
+                                <span>{item.qty}x {item.name}</span>
+                                <span>{formatRupiah(item.price * item.qty)}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="space-y-1 mb-6">
+                        <div className="flex justify-between font-bold text-lg">
+                            <span>TOTAL</span>
+                            <span>{formatRupiah(receiptData.total)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500 text-xs">
+                            <span>Bayar ({receiptData.method})</span>
+                            <span>{formatRupiah(receiptData.cashIn)}</span>
+                        </div>
+                        {receiptData.method === 'Tunai' && (
+                            <div className="flex justify-between text-gray-800 font-bold border-t border-dashed border-gray-200 pt-1 mt-1">
+                                <span>KEMBALI</span>
+                                <span>{formatRupiah(receiptData.change)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-xs mt-2 text-gray-400 pt-2">
+                            <span>Pelanggan</span>
+                            <span className="capitalize">{receiptData.customerName}</span>
+                        </div>
+                    </div>
+
+                    <div className="text-center text-[10px] text-gray-400 mt-4">
+                        <p>*** TERIMA KASIH ***</p>
+                    </div>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                    <button onClick={closeSuccessModal} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg">Transaksi Baru</button>
+                {/* Footer Action */}
+                <div className="bg-gray-800 p-4 flex gap-2">
+                    <button onClick={() => setReceiptData(null)} className="flex-1 py-2 bg-gray-700 text-white rounded font-bold hover:bg-gray-600 transition-colors">Tutup</button>
+                    <button onClick={() => window.print()} className="flex-1 py-2 bg-white text-gray-900 rounded font-bold hover:bg-gray-100 transition-colors flex justify-center items-center gap-2">
+                        <Printer size={16}/> Print
+                    </button>
                 </div>
             </div>
         </div>
