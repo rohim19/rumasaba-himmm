@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, User, FileText, X, CheckCircle, Printer, ArrowRight, Save, QrCode } from 'lucide-react';
-import qrisImage from '../assets/qris-toko.jpg';
+import qrisImage from '../assets/qris-saba.jpg';
 const Kasir = () => {
   // 1. AMBIL DATA MENU
   const [menuItems, setMenuItems] = useState([]);
@@ -348,7 +348,7 @@ const Kasir = () => {
 
                     <div className="text-center mb-4 border-b-2 border-dashed border-gray-200 pb-4">
                         <h2 className="font-black text-xl uppercase tracking-widest">RUMA SABA</h2>
-                        <p className="text-[10px] text-gray-500">Jl. Kopi Nikmat No. 1</p>
+                        <p className="text-[10px] text-gray-500">Jl. Masjid Al Hikmah Redisari</p>
                         <p className="text-[10px] text-gray-500">{new Date(receiptData.date).toLocaleString('id-ID')}</p>
                     </div>
 
